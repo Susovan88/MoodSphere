@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils"
 
 const NAV_ITEMS = [
   { title: "Dashboard",     href: "/dashboard",     icon: LayoutDashboard },
+  { title: "Profile",       href: "/profile",       icon: User            },
   { title: "Mood Tracking", href: "/mood-tracking", icon: BarChart3       },
   { title: "History",       href: "/history",       icon: ClockIcon       },
   { title: "Consultants",   href: "/consultants",   icon: Stethoscope     },
@@ -49,7 +50,7 @@ export function AppSidebar() {
     isCollapsed && "justify-center gap-0"
   )}>
 
-    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white">
+    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-linear-to-br from-orange-500 to-orange-600 text-white">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-1.44-4.44 3 3 0 0 1-1.09-5.13A2.5 2.5 0 0 1 9.5 2Z" />
         <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 1.44-4.44 3 3 0 0 0 1.09-5.13A2.5 2.5 0 0 0 14.5 2Z" />
@@ -58,7 +59,7 @@ export function AppSidebar() {
 
 
     {!isCollapsed && (
-      <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-[18px] font-bold tracking-tight text-transparent">
+      <span className="bg-linear-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-[18px] font-bold tracking-tight text-transparent">
         MoodSphere
       </span>
     )}
@@ -86,7 +87,7 @@ export function AppSidebar() {
                       "group h-10 rounded-xl border text-sm font-medium transition-all duration-150",
                       isCollapsed && "justify-center",
                       active
-                        ? "border-orange-200 bg-gradient-to-r from-orange-50 to-orange-100/60 text-orange-600 shadow-sm shadow-orange-100"
+                        ? "border-orange-200 bg-linear-to-r from-orange-50 to-orange-100/60 text-orange-600 shadow-sm shadow-orange-100"
                         : "border-transparent text-neutral-500 hover:border-orange-100 hover:bg-orange-50/50 hover:text-orange-600"
                     )}
                     render={(props) => (
@@ -124,11 +125,11 @@ export function AppSidebar() {
               size="lg"
               tooltip={user?.email ?? "Account"}
               className={cn(
-                "h-auto rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50 to-orange-100/40 px-3 py-2.5 hover:from-orange-100 hover:to-orange-50",
+                "h-auto rounded-xl border border-orange-100 bg-linear-to-br from-orange-50 to-orange-100/40 px-3 py-2.5 hover:from-orange-100 hover:to-orange-50",
                 isCollapsed && "p-1.5 justify-center"
               )}
             >
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-sm">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-orange-400 to-orange-600 text-white shadow-sm">
                 <User className="h-3.5 w-3.5" />
               </div>
               {!isCollapsed && (
