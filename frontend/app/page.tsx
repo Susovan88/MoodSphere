@@ -3,6 +3,7 @@ import { CtaSection } from "@/components/home/CtaSection"
 import HeroSection from "@/components/home/HeroSection"
 import { HowItWorksSection } from "@/components/home/HowItWorks"
 import Navbar from "@/components/home/Navbar"
+import { FooterSection } from "@/components/home/FooterSection"
 
 
 export default function Page() {
@@ -13,6 +14,7 @@ export default function Page() {
     <FeaturesSection/>
     <HowItWorksSection/>
     <CtaSection/>
+    <FooterSection/>
     </>
   )
 }
