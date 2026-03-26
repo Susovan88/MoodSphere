@@ -23,7 +23,6 @@ export const signup=async(req,res)=>{
             password:hashedPass,
         });
 
-        console.log("---> Sign up successful!");
         const token=generateToken(user._id);
         res.status(201).json({
             message:"sign up successful!",
