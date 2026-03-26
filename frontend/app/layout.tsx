@@ -14,6 +14,8 @@ const fontMono = Geist_Mono({
   variable: "--font-mono",
 })
 
+import { TooltipProvider } from "@/components/ui/tooltip"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -26,8 +28,9 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", inter.variable, geistHeading.variable)}
     >
       <body>
-          <AuthProvider>{children}</AuthProvider>
-
+          <AuthProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </AuthProvider>
       </body>
     </html>
   )
