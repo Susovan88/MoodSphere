@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
+from routes.session_routes import chat_bp
 app = Flask(__name__)
 
+app.register_blueprint(chat_bp, url_prefix='/api')  # Register the chat blueprint with a prefix
 
 @app.get('/')
 def index():

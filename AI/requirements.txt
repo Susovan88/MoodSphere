@@ -11,4 +11,5 @@ langchain-huggingface
 langchain-google-genai
 google-generativeai
 
+pymongo
 -e .
