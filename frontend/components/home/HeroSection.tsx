@@ -4,10 +4,12 @@ import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { DashboardPreview } from "@/components/home/dashboard-preview"
 import BackgroundPaths from "@/components/kokonutui/background-paths"
+import { useAuth } from "@/components/auth/auth-context"
 import { useRouter } from "next/navigation"
 
 export default function HeroSection() {
   const router = useRouter()
+  const { user } = useAuth()
 
   return (
     <>
@@ -44,10 +46,10 @@ export default function HeroSection() {
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
               <Button
-                onClick={() => router.push("/signup")}
+                onClick={() => router.push(user ? "/dashboard" : "/signup")}
                 className="h-11 rounded-full bg-linear-to-r from-orange-400 via-orange-500 to-orange-600 px-8 text-[15px] font-semibold text-white shadow-sm hover:opacity-90 transition-opacity"
               >
-                Get started
+                {user ? "Dashboard" : "Get started"}
               </Button>
               <Button
                 onClick={() => {

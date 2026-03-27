@@ -2,11 +2,13 @@
 
 import { Button } from "@/components/ui/button"
 import { Logo } from "@/components/logo"
+import { useAuth } from "@/components/auth/auth-context"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 
 export default function Navbar() {
   const router = useRouter()
+  const { user } = useAuth()
 
   return (
     <>
@@ -21,10 +23,10 @@ export default function Navbar() {
 
           <div className="flex items-center gap-3">
             <Button
-              onClick={() => router.push("/signup")}
+              onClick={() => router.push(user ? "/dashboard" : "/signup")}
               className="h-10 rounded-full bg-linear-to-r from-orange-400 via-orange-500 to-orange-600 px-7 text-[15px] font-semibold text-white transition-opacity hover:opacity-90"
             >
-              Get Started
+              {user ? "Dashboard" : "Get Started"}
             </Button>
           </div>
         </div>

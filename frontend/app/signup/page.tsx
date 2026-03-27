@@ -1,115 +1,95 @@
+"use client"
+
 import Link from "next/link"
+import { FormEvent, useState } from "react"
+import { useRouter } from "next/navigation"
 
 import { Logo } from "@/components/logo"
+import { useAuth } from "@/components/auth/auth-context"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export default function SignUpPage() {
+  const router = useRouter()
+  const { signup } = useAuth()
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+    setSubmitting(true)
+
+    const formData = new FormData(event.currentTarget)
+    const payload = {
+      name: String(formData.get("name") || ""),
+      email: String(formData.get("email") || ""),
+      phone: String(formData.get("phone") || ""),
+      password: String(formData.get("password") || ""),
+    }
+    console.log("Payload:", payload)
+
+    try {
+      await signup(payload)
+      router.push("/dashboard")
+    } catch (err) {
+      console.error("Signup error:", err)
+      setError(err instanceof Error ? err.message : "Signup failed")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <section className="bg-background grid min-h-screen grid-rows-[auto_1fr] px-4">
       <div className="mx-auto w-full max-w-7xl border-b py-3">
         <Logo withLink className="w-fit" />
       </div>
 
-      <div className="m-auto w-full max-w-2xl py-10">
+      <div className="m-auto w-full max-w-md py-10">
         <div className="text-center">
           <h1 className="font-heading text-4xl font-medium text-foreground">Create an account</h1>
-          <p className="text-muted-foreground mt-2 text-sm">Fill in your student details to start using MoodSphere</p>
+          <p className="text-muted-foreground mt-2 text-sm">Join MoodSphere to start tracking your mental wellness</p>
         </div>
 
         <Card className="mt-6 border border-border p-8">
-          <form className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="signup-name">Full Name</Label>
-                <Input id="signup-name" name="name" placeholder="Your full name" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-phone">Phone</Label>
-                <Input id="signup-phone" name="phone" type="tel" placeholder="10-digit phone" required />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="signup-email">Email</Label>
-                <Input
-                  type="email"
-                  id="signup-email"
-                  name="email"
-                  placeholder="you@example.com"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-password">Password</Label>
-                <Input type="password" id="signup-password" name="password" required />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="signup-university">University</Label>
-                <Input id="signup-university" name="university" placeholder="University name" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="signup-roll">Roll Number</Label>
-                <Input id="signup-roll" name="rollNumber" placeholder="Roll number" />
-              </div>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2 sm:col-span-1">
-                <Label htmlFor="signup-class">Class</Label>
-                <Input id="signup-class" name="className" placeholder="Class" />
-              </div>
-              <div className="space-y-2 sm:col-span-1">
-                <Label htmlFor="signup-section">Section</Label>
-                <Input id="signup-section" name="section" placeholder="Section" />
-              </div>
-              <div className="space-y-2 sm:col-span-1">
-                <Label htmlFor="signup-age">Age</Label>
-                <Input id="signup-age" name="age" type="number" min="1" placeholder="Age" />
-              </div>
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="signup-name">Full Name</Label>
+              <Input id="signup-name" name="name" placeholder="John Doe" required />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="signup-gender">Gender</Label>
-              <select
-                id="signup-gender"
-                name="gender"
-                className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-                defaultValue=""
-              >
-                <option value="" disabled>
-                  Select gender
-                </option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="parent-name">Parent Name</Label>
-                <Input id="parent-name" name="parentContact.name" placeholder="Parent name" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="parent-phone">Parent Phone</Label>
-                <Input id="parent-phone" name="parentContact.phone" type="tel" placeholder="Parent phone" />
-              </div>
+              <Label htmlFor="signup-phone">Phone Number</Label>
+              <Input id="signup-phone" name="phone" type="tel" placeholder="10-digit phone" required />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="parent-email">Parent Email</Label>
-              <Input id="parent-email" name="parentContact.email" type="email" placeholder="parent@example.com" />
+              <Label htmlFor="signup-email">Email Address</Label>
+              <Input
+                type="email"
+                id="signup-email"
+                name="email"
+                placeholder="you@university.edu"
+                required
+              />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="signup-password">Password</Label>
+              <Input type="password" id="signup-password" name="password" placeholder="••••••••" required />
+            </div>
 
-            <Button className="h-11 w-full text-sm font-semibold">Create Account</Button>
+            <Button type="submit" disabled={submitting} className="h-11 w-full text-sm font-semibold">
+              {submitting ? "Creating Account..." : "Create Account"}
+            </Button>
+
+            {error ? (
+              <p className="text-center text-sm text-red-500">{error}</p>
+            ) : null}
+
           </form>
         </Card>
 
