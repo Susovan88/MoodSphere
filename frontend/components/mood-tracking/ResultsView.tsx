@@ -1,6 +1,6 @@
 "use client"
 import { motion } from "framer-motion"
-import { RotateCcw, CheckCircle2, Activity, AlertCircle, TrendingUp, TrendingDown, Sparkles } from "lucide-react"
+import { RotateCcw, CheckCircle2, Activity, AlertCircle, TrendingUp, TrendingDown, Sparkles, NotebookPen } from "lucide-react"
 import { MoodResult } from "./types"
 import { fmt } from "./utils"
 import { ScoreArc } from "./ScoreArc"
@@ -10,6 +10,10 @@ interface ResultsViewProps {
   elapsed: number
   responseCount: number
   onReset: () => void
+  onGenerateBlog?: () => void
+  onOpenBlogs?: () => void
+  blogGenerating?: boolean
+  blogStatus?: string | null
 }
 
 const EMOTION_HINT: Record<string, { icon: string; text: string }> = {
@@ -49,7 +53,16 @@ const RISK_STYLE = {
   },
 } as const
 
-export function ResultsView({ result, elapsed, responseCount, onReset }: ResultsViewProps) {
+export function ResultsView({
+  result,
+  elapsed,
+  responseCount,
+  onReset,
+  onGenerateBlog,
+  onOpenBlogs,
+  blogGenerating = false,
+  blogStatus = null,
+}: ResultsViewProps) {
   const emotion = EMOTION_HINT[result.emotion] || { icon: "🙂", text: "Emotion detected from your session" }
   const risk = RISK_STYLE[result.riskLevel]
   const details = result.details
@@ -98,11 +111,53 @@ export function ResultsView({ result, elapsed, responseCount, onReset }: Results
               {fmt(elapsed)} · {responseCount} responses captured
             </p>
           </div>
-          <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={onReset}
-            className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
-            style={{ border: "1px solid #e5e7eb", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", cursor: "pointer", color: "#374151", fontFamily: "inherit", fontWeight: 600 }}>
-            <RotateCcw size={12} />New session
-          </motion.button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              {onGenerateBlog ? (
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={onGenerateBlog}
+                  disabled={blogGenerating}
+                  className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
+                  style={{
+                    border: "1px solid #fed7aa",
+                    background: "rgba(255,247,237,0.95)",
+                    backdropFilter: "blur(8px)",
+                    cursor: blogGenerating ? "not-allowed" : "pointer",
+                    color: "#9a3412",
+                    fontFamily: "inherit",
+                    fontWeight: 600,
+                    opacity: blogGenerating ? 0.7 : 1,
+                  }}
+                >
+                  <NotebookPen size={12} />
+                  {blogGenerating ? "Generating..." : "Generate Blog"}
+                </motion.button>
+              ) : null}
+
+              <motion.button whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} onClick={onReset}
+                className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm"
+                style={{ border: "1px solid #e5e7eb", background: "rgba(255,255,255,0.85)", backdropFilter: "blur(8px)", cursor: "pointer", color: "#374151", fontFamily: "inherit", fontWeight: 600 }}>
+                <RotateCcw size={12} />New session
+              </motion.button>
+            </div>
+
+            {blogStatus ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-emerald-700">{blogStatus}</span>
+                {onOpenBlogs ? (
+                  <button
+                    type="button"
+                    onClick={onOpenBlogs}
+                    className="text-xs font-semibold text-orange-600 hover:text-orange-700"
+                  >
+                    View Blogs
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* ── Top 3 cards ── */}

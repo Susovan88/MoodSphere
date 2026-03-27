@@ -1,6 +1,6 @@
 import express from "express";
 import { signup,login } from "../controllers/auth.js";
-import { startSession, sendMessage, endSession, getSessionDetails } from "../controllers/session.js";
+import { startSession, sendMessage, endSession, getSessionDetails, getStudentSessionHistory } from "../controllers/session.js";
 import { protect as auth } from "../middleware/auth.js";
 import { getStudentProfile, updateStudentProfile } from "../controllers/profile.js";
 import {
@@ -14,9 +14,10 @@ import {
   listAvailableDoctors,
   createConsultation,
   getStudentCurrentConsultations,
+	getStudentConsultationHistory,
 	getStudentStreamToken,
 } from "../controllers/consultation.js";
-import { generateAndSaveBlog } from "../controllers/generateBlog.js";
+import { generateAndSaveBlog, getAllBlogs } from "../controllers/generateBlog.js";
 
 const router=express.Router();
 
@@ -29,6 +30,7 @@ router.post("/start", auth, startSession);
 router.post("/message", auth, sendMessage);
 router.post("/end", auth, endSession);
 router.get("/session/:sessionId/details", auth, getSessionDetails);
+router.get("/sessions/history", auth, getStudentSessionHistory);
 
 // Additional routes for profile
 router.get("/profile", auth, getStudentProfile);
@@ -44,8 +46,10 @@ router.get("/dashboard/ai-tips", auth, getDashboardAiTips);
 // Consultation routes
 router.get("/consultants", auth, listAvailableDoctors);
 router.get("/consultations/current", auth, getStudentCurrentConsultations);
+router.get("/consultations/history", auth, getStudentConsultationHistory);
 router.post("/consultations", auth, createConsultation);
 router.post("/consultations/:consultationId/stream-token", auth, getStudentStreamToken);
-router.post("/generate-blog", generateAndSaveBlog);
+router.post("/generate-blog", auth, generateAndSaveBlog);
+router.get("/blogs", auth, getAllBlogs);
 
 export default router;
