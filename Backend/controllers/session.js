@@ -57,6 +57,9 @@ export const endSession = async (req, res) => {
     if (String(session.studentId) !== String(req.user.id)) {
       return res.status(403).json({ msg: "You are not allowed to access this session" });
     }
+    if (String(session.studentId) !== String(req.user.id)) {
+      return res.status(403).json({ msg: "You are not allowed to access this session" });
+    }
 
     // 2️⃣ Get student
     const student = await Student.findById(req.user.id);
@@ -152,11 +155,12 @@ export const endSession = async (req, res) => {
   }
 };
 
+
+
 export const sendMessage = async (req, res) => {
   try {
-    const { sessionId, message, studentId } = req.body;
+    const { sessionId } = req.params;
 
-    // 1️⃣ Find session
     const session = await Session.findById(sessionId);
     if (!session) {
       return res.status(404).json({ msg: "Session not found" });

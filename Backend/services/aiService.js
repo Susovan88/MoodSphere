@@ -127,18 +127,8 @@ export const getFinalAIResponse = async ({
     console.error("AI Service Error:", errorMessage);
 
     return {
-      success: true,
-      data: {
-        finalEmotion: "neutral",
-        confidence: 0,
-        riskLevel: "unknown",
-        reply: "I'm sorry, I'm having trouble understanding right now. Can you tell me more?",
-        action: "none",
-        modelEmotion: "neutral",
-        studentContext: studentData || {},
-      },
-      degraded: true,
-      message: errorMessage,
+      success: false,
+      message: "AI processing failed",
     };
   }
 };
