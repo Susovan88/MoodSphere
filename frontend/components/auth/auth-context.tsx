@@ -13,7 +13,10 @@ type AuthUser = {
   name: string
   email: string
   phone?: string
+  specialization?: string
 }
+
+type UserType = "student" | "doctor"
 
 type LoginPayload = {
   email: string
@@ -25,14 +28,20 @@ type SignupPayload = {
   email: string
   phone: string
   password: string
+  specialization?: string
+  licenseNumber?: string
+  experience?: number
+  consultationFee?: number
+  city?: string
 }
 
 type AuthContextValue = {
   user: AuthUser | null
   token: string | null
+  userType: UserType
   loading: boolean
-  login: (payload: LoginPayload) => Promise<void>
-  signup: (payload: SignupPayload) => Promise<void>
+  login: (payload: LoginPayload, type?: UserType) => Promise<void>
+  signup: (payload: SignupPayload, type?: UserType) => Promise<void>
   logout: () => void
 }
 
@@ -43,6 +52,7 @@ const API_BASE =
 
 const TOKEN_KEY = "moodsphere.token"
 const USER_KEY = "moodsphere.user"
+const USER_TYPE_KEY = "moodsphere.userType"
 
 async function requestJSON<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -79,42 +89,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   })
 
+  const [userType, setUserType] = useState<UserType>(() => {
+    if (typeof window === "undefined") return "student"
+    const savedType = localStorage.getItem(USER_TYPE_KEY)
+    return savedType === "doctor" ? "doctor" : "student"
+  })
+
   const loading = false
 
-  const setSession = useCallback((nextToken: string, nextUser: AuthUser) => {
+  const setSession = useCallback((nextToken: string, nextUser: AuthUser, nextUserType: UserType) => {
     setToken(nextToken)
     setUser(nextUser)
+    setUserType(nextUserType)
     localStorage.setItem(TOKEN_KEY, nextToken)
     localStorage.setItem(USER_KEY, JSON.stringify(nextUser))
+    localStorage.setItem(USER_TYPE_KEY, nextUserType)
   }, [])
 
   const login = useCallback(
-    async (payload: LoginPayload) => {
+    async (payload: LoginPayload, type: UserType = "student") => {
       const data = await requestJSON<{
         token: string
-        user: AuthUser
-      }>("/api/student/login", {
+        user?: AuthUser
+        doctor?: AuthUser
+      }>(`/api/${type}/login`, {
         method: "POST",
         body: JSON.stringify(payload),
       })
 
-      setSession(data.token, data.user)
+      const actor = data.user || data.doctor
+      if (!actor) throw new Error("Invalid auth response")
+      setSession(data.token, actor, type)
     },
     [setSession]
   )
 
   const signup = useCallback(
-    async (payload: SignupPayload) => {
+    async (payload: SignupPayload, type: UserType = "student") => {
       const data = await requestJSON<{
         token: string
-        user: AuthUser
-      }>("/api/student/signup", {
+        user?: AuthUser
+        doctor?: AuthUser
+      }>(`/api/${type}/signup`, {
         method: "POST",
         body: JSON.stringify(payload),
       })
 
-      console.log("Signup response received:", data)
-      setSession(data.token, data.user)
+      const actor = data.user || data.doctor
+      if (!actor) throw new Error("Invalid auth response")
+      setSession(data.token, actor, type)
     },
     [setSession]
   )
@@ -122,13 +145,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
+    setUserType("student")
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
+    localStorage.removeItem(USER_TYPE_KEY)
   }, [])
 
   const value = useMemo(
-    () => ({ user, token, loading, login, signup, logout }),
-    [user, token, loading, login, signup, logout]
+    () => ({ user, token, userType, loading, login, signup, logout }),
+    [user, token, userType, loading, login, signup, logout]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
