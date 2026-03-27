@@ -7,6 +7,10 @@ import {
 	getCurrentConsultations,
 	getCompletedConsultations,
 } from "../controllers/doctor.js";
+import {
+	getDoctorStreamToken,
+  completeConsultation,
+} from "../controllers/consultation.js";
 
 const router = express.Router();
 
@@ -19,6 +23,8 @@ router.get("/profile", auth, getDoctorProfile);
 router.put("/profile", auth, updateDoctorProfile);
 router.get("/consultations/current", auth, getCurrentConsultations);
 router.get("/consultations/history", auth, getCompletedConsultations);
+router.post("/consultations/:consultationId/stream-token", auth, getDoctorStreamToken);
+router.patch("/consultations/:consultationId/complete", auth, completeConsultation);
 
 
 export default router;

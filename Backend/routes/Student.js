@@ -10,6 +10,12 @@ import {
 	getDashboardStreak,
 	getDashboardTrend,
 } from "../controllers/dashboard.js";
+import {
+  listAvailableDoctors,
+  createConsultation,
+  getStudentCurrentConsultations,
+	getStudentStreamToken,
+} from "../controllers/consultation.js";
 
 const router=express.Router();
 
@@ -33,5 +39,11 @@ router.get("/dashboard/trend", auth, getDashboardTrend);
 router.get("/dashboard/streak", auth, getDashboardStreak);
 router.get("/dashboard/recent-sessions", auth, getDashboardRecentSessions);
 router.get("/dashboard/ai-tips", auth, getDashboardAiTips);
+
+// Consultation routes
+router.get("/consultants", auth, listAvailableDoctors);
+router.get("/consultations/current", auth, getStudentCurrentConsultations);
+router.post("/consultations", auth, createConsultation);
+router.post("/consultations/:consultationId/stream-token", auth, getStudentStreamToken);
 
 export default router;

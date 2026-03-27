@@ -47,27 +47,70 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "http://localhost:5005"
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || ""
+
+const FALLBACK_API_BASES = [
+  "http://localhost:5005",
+  "http://127.0.0.1:5005",
+  "http://localhost:5001",
+  "http://127.0.0.1:5001",
+]
+
+const API_BASES = [API_BASE, ...FALLBACK_API_BASES].filter(Boolean)
 
 const TOKEN_KEY = "moodsphere.token"
 const USER_KEY = "moodsphere.user"
 const USER_TYPE_KEY = "moodsphere.userType"
 
 async function requestJSON<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    ...init,
-  })
+  let lastNetworkError: Error | null = null
 
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) {
-    throw new Error(data?.message || "Request failed")
+  for (const base of API_BASES) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 12000)
+
+    try {
+      const response = await fetch(`${base}${path}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(init?.headers ?? {}),
+        },
+        ...init,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data?.message || `Request failed (${response.status})`)
+      }
+
+      return data as T
+    } catch (error) {
+      clearTimeout(timeoutId)
+
+      const normalizedError =
+        error instanceof Error ? error : new Error("Network request failed")
+
+      const isNetworkFailure =
+        normalizedError.name === "TypeError" ||
+        normalizedError.name === "AbortError" ||
+        /fetch|network|load failed|failed to fetch/i.test(normalizedError.message)
+
+      if (!isNetworkFailure) {
+        throw normalizedError
+      }
+
+      lastNetworkError = normalizedError
+    }
   }
-  return data as T
+
+  throw new Error(
+    lastNetworkError?.name === "AbortError"
+      ? "Backend request timed out. Please ensure the backend server is running."
+      : "Cannot connect to backend API. Start backend server and set NEXT_PUBLIC_BACKEND_URL if needed."
+  )
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
