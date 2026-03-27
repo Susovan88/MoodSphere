@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
   BarChart3,
+  BookText,
   ChevronRight,
   ClockIcon,
   LayoutDashboard,
@@ -31,6 +32,7 @@ const STUDENT_NAV_ITEMS = [
   { title: "Dashboard",     href: "/dashboard",     icon: LayoutDashboard },
   { title: "Profile",       href: "/profile",       icon: User            },
   { title: "Mood Tracking", href: "/mood-tracking", icon: BarChart3       },
+  { title: "Blogs",         href: "/blogs",         icon: BookText        },
   { title: "History",       href: "/history",       icon: ClockIcon       },
   { title: "Consultants",   href: "/consultants",   icon: Stethoscope     },
 ]

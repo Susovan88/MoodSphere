@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { AnimatePresence } from "framer-motion"
 import SpeechRecognition, { useSpeechRecognition } from "react-speech-recognition"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/components/auth/auth-context"
 import {
   Phase, RiskLevel, ChatMsg, MoodResult, SessionDetails,
@@ -15,7 +16,7 @@ const INITIAL_INTERVIEW_PROMPT =
 
 const CAPTURE_INTERVAL_MS = 1800
 const API_BASE_DEFAULT = process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "http://localhost:5005"
-const API_BASE_CANDIDATES = [API_BASE_DEFAULT, "http://localhost:5005", "http://localhost:5000"]
+const API_BASE_CANDIDATES = [API_BASE_DEFAULT, "http://localhost:5005", "http://127.0.0.1:5005"]
   .filter((value, index, arr) => Boolean(value) && arr.indexOf(value) === index)
 
 const normalizeTranscript = (text: string) => text.replace(/\s+/g, " ").trim()
@@ -68,6 +69,7 @@ const toScoreNumber = (value: number) => {
 
 
 export default function MoodTrackingPage() {
+  const router = useRouter()
   const { token } = useAuth()
   const [phase, setPhase] = useState<Phase>("landing")
   const [elapsed, setElapsed] = useState(0)
@@ -84,6 +86,8 @@ export default function MoodTrackingPage() {
   const [activeStream, setActiveStream] = useState<MediaStream | null>(null)
   const [backendSessionId, setBackendSessionId] = useState<string | null>(null)
   const [activeApiBase, setActiveApiBase] = useState(API_BASE_DEFAULT)
+  const [blogGenerating, setBlogGenerating] = useState(false)
+  const [blogStatus, setBlogStatus] = useState<string | null>(null)
 
   // react-speech-recognition 
   const {
@@ -123,22 +127,27 @@ export default function MoodTrackingPage() {
       let lastError = "Request failed"
 
       for (const base of candidateBases) {
+        let response: Response
         try {
-          const response = await fetch(`${base}${path}`, init)
-          const data = await response.json().catch(() => ({})) as T & { message?: string; msg?: string; error?: string }
-
-          if (!response.ok) {
-            throw new Error(data?.message || data?.msg || data?.error || `Request failed (${response.status})`)
-          }
-
-          if (base !== activeApiBase) {
-            setActiveApiBase(base)
-          }
-
-          return data as T
+          response = await fetch(`${base}${path}`, init)
         } catch (error) {
+          // Retry only on network/CORS style failures where fetch itself rejects.
           lastError = error instanceof Error ? error.message : "Network request failed"
+          continue
         }
+
+        const data = await response.json().catch(() => ({})) as T & { message?: string; msg?: string; error?: string }
+
+        if (!response.ok) {
+          // Surface backend error directly instead of masking it with fallback attempts.
+          throw new Error(data?.message || data?.msg || data?.error || `Request failed (${response.status})`)
+        }
+
+        if (base !== activeApiBase) {
+          setActiveApiBase(base)
+        }
+
+        return data as T
       }
 
       throw new Error(lastError)
@@ -420,6 +429,8 @@ export default function MoodTrackingPage() {
     setResponseCount(0)
     setIsRecording(false)
     setBackendSessionId(null)
+    setBlogStatus(null)
+    setBlogGenerating(false)
     transcriptRef.current = ""
     resetTranscript()
 
@@ -553,6 +564,7 @@ export default function MoodTrackingPage() {
 
       setTimeout(() => {
         setResult({
+          sessionId: detailsSessionId,
           finalScore: final,
           textScore,
           voiceScore,
@@ -563,6 +575,8 @@ export default function MoodTrackingPage() {
           suggestions,
           details,
         })
+        setBlogStatus(null)
+        setBlogGenerating(false)
         setPhase("results")
       }, 1700)
     } catch (error) {
@@ -587,6 +601,44 @@ export default function MoodTrackingPage() {
     setResponseCount(0)
     setBackendSessionId(null)
     setIsRecording(false)
+    setBlogStatus(null)
+    setBlogGenerating(false)
+  }
+
+  const handleGenerateBlog = async () => {
+    if (!token) {
+      alert("Please login first")
+      return
+    }
+
+    const targetSessionId = result?.sessionId || backendSessionId
+    if (!targetSessionId) {
+      alert("Session id is missing. Please start a new session.")
+      return
+    }
+
+    setBlogGenerating(true)
+    setBlogStatus(null)
+
+    try {
+      const response = await requestWithFallback<{ message?: string; error?: string }>("/api/student/generate-blog", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          sessions_id: [targetSessionId],
+        }),
+      })
+
+      setBlogStatus(response.message || "Blog generated successfully")
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not generate blog"
+      setBlogStatus(message)
+    } finally {
+      setBlogGenerating(false)
+    }
   }
 
   useEffect(() => {
@@ -605,7 +657,17 @@ export default function MoodTrackingPage() {
         {phase === "landing"   && <LandingView key="landing" onStart={startSession} />}
         {phase === "analyzing" && <AnalyzingView key="analyzing" analyzeStep={analyzeStep} />}
         {phase === "results" && result && (
-          <ResultsView key="results" result={result} elapsed={elapsed} responseCount={responseCount} onReset={reset} />
+          <ResultsView
+            key="results"
+            result={result}
+            elapsed={elapsed}
+            responseCount={responseCount}
+            onReset={reset}
+            onGenerateBlog={handleGenerateBlog}
+            onOpenBlogs={() => router.push("/blogs")}
+            blogGenerating={blogGenerating}
+            blogStatus={blogStatus}
+          />
         )}
         {phase === "session" && (
           <SessionView

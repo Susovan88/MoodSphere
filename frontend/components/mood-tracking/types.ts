@@ -35,6 +35,7 @@ export interface SessionDetails {
 }
 
 export interface MoodResult {
+  sessionId?: string
   finalScore: number
   textScore: number
   voiceScore: number
