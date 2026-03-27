@@ -2,6 +2,8 @@ import Session from "../models/Session.js";
 import CryptoJS from "crypto-js";
 import Student from "../models/Student.js";
 import { getFinalAIResponse } from "../services/aiService.js";
+import path from "path";
+import fs from "fs";
 
 // Weights for final score (can be set via env: WEIGHT_TEXT, WEIGHT_VOICE, WEIGHT_FACE)
 let W_TEXT = typeof process.env.WEIGHT_TEXT !== "undefined" ? Number(process.env.WEIGHT_TEXT) : 0.6;
@@ -39,70 +41,6 @@ export const startSession = async (req, res) => {
 // Encrypt
 const encrypt = (text) => {
   return CryptoJS.AES.encrypt(text, process.env.SECRET_KEY).toString();
-};
-// controllers/session.js
-
-export const sendMessage = async (req, res) => {
-  try {
-    const { sessionId, message, studentData } = req.body;
-
-    // 1️⃣ Find session
-    const session = await Session.findById(sessionId);
-    if (!session) {
-      return res.status(404).json({ msg: "Session not found" });
-    }
-
-    // 2️⃣ Call AI Service (🔥 MAIN CHANGE)
-    const aiResult = await getFinalAIResponse({
-      message,
-      studentData,
-    });
-
-    console.log("AI Result:", aiResult);
-
-    if (!aiResult.success) {
-      return res.status(500).json({ msg: "AI processing failed" });
-    }
-
-    const data = aiResult.data;
-
-    // 3️⃣ Prepare scores (fallback safe)
-    const textScore = data.confidence || 0;   // from emotion model
-    const voiceScore = 0;
-    const faceScore = 0;
-
-    // 4️⃣ Calculate final score
-    const finalScore =
-      W_TEXT * textScore +
-      W_VOICE * voiceScore +
-      W_FACE * faceScore;
-
-    // 5️⃣ Save message in DB
-    session.messages.push({
-      userMessage: encrypt(message),
-      aiResponse: data.reply,
-      textScore,
-      voiceScore,
-      faceScore,
-      finalScore,
-      emotion: data.finalEmotion,
-    });
-
-    await session.save();
-
-    // 6️⃣ Send response
-    res.status(200).json({
-      reply: data.reply,
-      emotion: data.finalEmotion,
-      score: finalScore,
-      riskLevel: data.riskLevel,
-      action: data.action,
-    });
-
-  } catch (error) {
-    console.error("SendMessage Error:", error.message);
-    res.status(500).json({ error: error.message });
-  }
 };
 
 // End session and calculate final mood
@@ -204,3 +142,193 @@ export const endSession = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+
+
+export const sendMessage = async (req, res) => {
+  try {
+    const { sessionId, message, studentId } = req.body;
+
+    // 1️⃣ Find session
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ msg: "Session not found" });
+    }
+
+    // 2️⃣ Find student
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ msg: "Student not found" });
+    }
+
+    // 3️⃣ Get image path (🔥 NO __dirname)
+    let imagePath = null;
+    if (req.file) {
+      imagePath = req.file.path;
+
+      // Safety check
+      if (!fs.existsSync(imagePath)) {
+        console.log("Image file missing!");
+        imagePath = null;
+      }
+    }
+
+    // 4️⃣ Build student data
+    const studentData = {
+      name: student.name,
+      currentMood: student.currentMood,
+      moodScore: student.moodScore,
+      riskLevel: student.riskLevel,
+    };
+
+    // 5️⃣ Call AI Service
+    const aiResult = await getFinalAIResponse({
+      message,
+      studentData,
+      imagePath,
+    });
+
+    console.log("AI Result:", aiResult);
+
+    if (!aiResult.success) {
+      return res.status(500).json({ msg: "AI processing failed" });
+    }
+
+    const data = aiResult.data;
+
+    // 🔥 6️⃣ Extract scores (UPDATED)
+    const textScore = data.emotions?.text?.confidence || 0;
+    const faceScore = data.emotions?.image?.confidence || 0;
+    const voiceScore = 0;
+
+    // 🔥 7️⃣ Final score calculation
+    const finalScore =
+      W_TEXT * textScore +
+      W_VOICE * voiceScore +
+      W_FACE * faceScore;
+
+    // 8️⃣ Save message in DB
+    session.messages.push({
+      userMessage: encrypt(message),
+      aiResponse: data.reply,
+      textScore,
+      voiceScore,
+      faceScore,
+      finalScore,
+      emotion: data.finalEmotion,
+    });
+
+    await session.save();
+
+    // 🧹 9️⃣ Optional: delete image after processing
+    if (imagePath) {
+      fs.unlink(imagePath, () => {});
+    }
+
+    // 🔟 Send response
+    res.status(200).json({
+      reply: data.reply,
+      emotion: data.finalEmotion,
+      score: finalScore,
+      riskLevel: data.riskLevel,
+      action: data.action,
+
+      // 🔥 BONUS (very useful for frontend)
+      emotions: data.emotions,
+    });
+
+  } catch (error) {
+    console.error("SendMessage Error:", error.message);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+
+
+
+
+// export const sendMessage = async (req, res) => {
+//   try {
+//     const { sessionId, message, studentId } = req.body;
+
+//     // 1️⃣ Find session
+//     const session = await Session.findById(sessionId);
+//     if (!session) {
+//       return res.status(404).json({ msg: "Session not found" });
+//     }
+
+//     const student = await Student.findById(studentId);
+//     if (!student) {
+//       return res.status(404).json({ msg: "Student not found" });
+//     } 
+
+//     // 2️⃣ Handle image file upload
+//     let imagePath = null;
+//     if (req.file) {
+//       const uploadDir = path.join(__dirname, "../uploads");
+//       if (!fs.existsSync(uploadDir)) {
+//         fs.mkdirSync(uploadDir);
+//       }
+//       imagePath = path.join(uploadDir, req.file.filename);
+//     }
+//     const studentData = {
+//       name: student.name,
+//       currentMood: student.currentMood,
+//       moodScore: student.moodScore,
+//       riskLevel: student.riskLevel,
+      
+//     };
+
+//     // 3️⃣ Call AI Service (🔥 MAIN CHANGE)
+//     const aiResult = await getFinalAIResponse({
+//       message,
+//       studentData,
+//       imagePath, // Pass image path if available
+//     });
+
+//     console.log("AI Result:", aiResult);
+
+//     if (!aiResult.success) {
+//       return res.status(500).json({ msg: "AI processing failed" });
+//     }
+
+//     const data = aiResult.data;
+
+//     // 4️⃣ Prepare scores (fallback safe)
+//     const textScore = data.confidence || 0;   // from emotion model
+//     const voiceScore = 0;
+//     const faceScore = 0;
+
+//     // 5️⃣ Calculate final score
+//     const finalScore =
+//       W_TEXT * textScore +
+//       W_VOICE * voiceScore +
+//       W_FACE * faceScore;
+
+//     // 6️⃣ Save message in DB
+//     session.messages.push({
+//       userMessage: encrypt(message),
+//       aiResponse: data.reply,
+//       textScore,
+//       voiceScore,
+//       faceScore,
+//       finalScore,
+//       emotion: data.finalEmotion,
+//     });
+
+//     await session.save();
+
+//     // 7️⃣ Send response
+//     res.status(200).json({
+//       reply: data.reply,
+//       emotion: data.finalEmotion,
+//       score: finalScore,
+//       riskLevel: data.riskLevel,
+//       action: data.action,
+//     });
+
+//   } catch (error) {
+//     console.error("SendMessage Error:", error.message);
+//     res.status(500).json({ error: error.message });
+//   }
+// };

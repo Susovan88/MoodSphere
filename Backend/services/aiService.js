@@ -1,29 +1,67 @@
-// services/aiService.js
-
 import axios from "axios";
+import FormData from "form-data";
+import fs from "fs";
 
-export const getFinalAIResponse = async ({ message, studentData }) => {
+export const getFinalAIResponse = async ({
+  message,
+  studentData,
+  imagePath // optional
+}) => {
   try {
-    // 🔹 1. Call Emotion Detection API
-    const emotionRes = await axios.post(
+    // 🔹 1. TEXT Emotion Detection (existing)
+    const textEmotionRes = await axios.post(
       "http://127.0.0.1:8000/predict",
       { text: message }
     );
 
-    const emotionData = emotionRes.data[0];
+    const textEmotionData = textEmotionRes.data[0];
 
-    // Extract values
-    const detectedEmotion = emotionData.prediction;
-    const confidence = emotionData.confidence;
+    const textEmotion = textEmotionData.prediction;
+    const textConfidence = textEmotionData.confidence;
 
-    // 🔹 2. Call Chat API with enhanced data
+    // 🔹 2. IMAGE Emotion Detection (NEW FEATURE 🔥)
+    let imageEmotion = null;
+    let imageConfidence = null;
+    let imageScores = null;
+
+    if (imagePath) {
+      try {
+        const form = new FormData();
+        form.append("image", fs.createReadStream(imagePath));
+
+        const imageRes = await axios.post(
+          "http://127.0.0.1:5000/detect-emotion",
+          form,
+          { headers: form.getHeaders() }
+        );
+
+        imageEmotion = imageRes.data.dominant_emotion;
+        imageConfidence = imageRes.data.confidence;
+        imageScores = imageRes.data.emotion_scores;
+
+      } catch (err) {
+        console.log("Image Emotion Error:", err.message);
+      }
+    }
+
+    // 🔥 3. Combine emotions (simple logic)
+    const finalDetectedEmotion =
+      imageEmotion || textEmotion; // prefer image if available
+
+    const finalConfidence =
+      imageConfidence || textConfidence;
+
+    // 🔹 4. Call Chat API with BOTH emotions
     const chatRes = await axios.post(
       "http://127.0.0.1:5000/api/chat",
       {
         student_data: {
           ...studentData,
-          detected_emotion: detectedEmotion,
-          confidence: confidence,
+          text_emotion: textEmotion,
+          text_confidence: textConfidence,
+          image_emotion: imageEmotion,
+          image_confidence: imageConfidence,
+          final_emotion: finalDetectedEmotion,
         },
         message,
       }
@@ -31,7 +69,7 @@ export const getFinalAIResponse = async ({ message, studentData }) => {
 
     let aiResponse = chatRes.data.data.response;
 
-    // 🔥 3. Clean LLM JSON (remove ```json block)
+    // 🔥 5. Clean LLM JSON
     if (aiResponse.includes("```")) {
       aiResponse = aiResponse
         .replace(/```json/g, "")
@@ -44,25 +82,41 @@ export const getFinalAIResponse = async ({ message, studentData }) => {
       parsed = JSON.parse(aiResponse);
     } catch (err) {
       parsed = {
-        emotion: detectedEmotion,
+        emotion: finalDetectedEmotion,
         risk_level: "unknown",
         response: aiResponse,
         action: "none",
       };
     }
 
-    // 🔥 4. Final Combined Output
+    // 🔥 6. Final Response (IMPORTANT UPGRADE)
     return {
       success: true,
       data: {
-        finalEmotion: parsed.emotion || detectedEmotion,
-        confidence,
+        // 🎯 Final AI Output
+        finalEmotion: parsed.emotion || finalDetectedEmotion,
         riskLevel: parsed.risk_level,
         reply: parsed.response,
         action: parsed.action,
 
-        // Debug / analytics
-        modelEmotion: detectedEmotion,
+        // 🧠 Emotion Breakdown (NEW FEATURE 🔥)
+        emotions: {
+          text: {
+            emotion: textEmotion,
+            confidence: textConfidence,
+          },
+          image: {
+            emotion: imageEmotion,
+            confidence: imageConfidence,
+            scores: imageScores,
+          },
+          final: {
+            emotion: finalDetectedEmotion,
+            confidence: finalConfidence,
+          }
+        },
+
+        // Debug
         studentContext: chatRes.data.data.student_context,
       },
     };
