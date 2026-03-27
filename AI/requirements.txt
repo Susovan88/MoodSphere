@@ -1,15 +1,42 @@
-langchain==0.3.26
-flask==3.1.1 
-sentence-transformers==4.1.0
-pypdf==5.6.1 
+# Core Backend
+flask==3.1.1
 python-dotenv==1.1.0
-langchain-pinecone==0.2.8 
-langchain-community==0.3.26
-langchain-huggingface
 
-# Gemini (FREE replacement of OpenAI)
+# LangChain + Gemini
+langchain==0.3.26
+langchain-community==0.3.26
+langchain-pinecone==0.2.8
+langchain-huggingface
 langchain-google-genai
 google-generativeai
 
+# ML / Data
+pandas
+numpy
+scikit-learn
+xgboost
+matplotlib
+joblib
+
+# NLP / Embeddings
+sentence-transformers==4.1.0
+transformers==4.41.0
+
+# PDF
+pypdf==5.6.1
+
+# Database
 pymongo
+
+# Emotion Detection (FER + optional DeepFace)
+fer==22.4.0
+opencv-python
+
+# Deep Learning (VERY IMPORTANT FIX 🔥)
+tensorflow
+keras
+tf-keras
+
+
+# Local package
 -e .
