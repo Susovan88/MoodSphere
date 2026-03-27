@@ -27,7 +27,7 @@ import {
 import { useAuth } from "@/components/auth/auth-context"
 import { cn } from "@/lib/utils"
 
-const NAV_ITEMS = [
+const STUDENT_NAV_ITEMS = [
   { title: "Dashboard",     href: "/dashboard",     icon: LayoutDashboard },
   { title: "Profile",       href: "/profile",       icon: User            },
   { title: "Mood Tracking", href: "/mood-tracking", icon: BarChart3       },
@@ -35,11 +35,19 @@ const NAV_ITEMS = [
   { title: "Consultants",   href: "/consultants",   icon: Stethoscope     },
 ]
 
+const DOCTOR_NAV_ITEMS = [
+  { title: "Profile",      href: "/doctor/profile",      icon: User            },
+  { title: "Consultations", href: "/doctor/consultants", icon: Stethoscope     },
+  { title: "History",      href: "/doctor/history",      icon: ClockIcon       },
+]
+
 export function AppSidebar() {
   const pathname = usePathname()
-  const { user, logout } = useAuth()
+  const { user, userType, logout } = useAuth()
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
+  const isDoctor = userType === "doctor" || pathname.startsWith("/doctor")
+  const navItems = isDoctor ? DOCTOR_NAV_ITEMS : STUDENT_NAV_ITEMS
 
   return (
     <Sidebar collapsible="icon" className="border-r border-orange-100/60 bg-white">
@@ -70,11 +78,11 @@ export function AppSidebar() {
         <SidebarGroup>
           {!isCollapsed && (
             <SidebarGroupLabel className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-widest text-orange-400/70">
-              Menu
+              {isDoctor ? "Doctor" : "Menu"}
             </SidebarGroupLabel>
           )}
           <SidebarMenu className="space-y-0.5">
-            {NAV_ITEMS.map((item) => {
+            {navItems.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/")
               const Icon = item.icon
               return (

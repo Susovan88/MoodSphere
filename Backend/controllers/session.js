@@ -40,16 +40,130 @@ export const startSession = async (req, res) => {
 const encrypt = (text) => {
   return CryptoJS.AES.encrypt(text, process.env.SECRET_KEY).toString();
 };
+
+const decrypt = (text) => {
+  try {
+    if (!text) return "";
+    const bytes = CryptoJS.AES.decrypt(text, process.env.SECRET_KEY);
+    return bytes.toString(CryptoJS.enc.Utf8) || text;
+  } catch {
+    return text;
+  }
+};
+
+const emotionBaseScore = (emotion) => {
+  const label = String(emotion || "").toLowerCase();
+  if (["very_negative", "negative", "sad", "angry", "fear", "stressed", "stress", "anxious", "tired", "unease", "disappointment", "disappointed", "low"].some((token) => label.includes(token))) return -0.8;
+  if (["neutral", "calm", "reflective"].some((token) => label.includes(token))) return 0;
+  if (["very_positive", "positive", "happy", "hopeful", "joy", "joyful", "excited"].some((token) => label.includes(token))) return 0.8;
+  return 0;
+};
+
+const clamp01 = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(1, parsed));
+};
+
+const toRiskLevel = (score) => {
+  if (score < -0.5) return "high";
+  if (score < -0.2) return "medium";
+  return "low";
+};
+
+const keywordSentimentScore = (message) => {
+  const text = String(message || "").toLowerCase();
+  if (!text.trim()) return 0;
+
+  const negativeTokens = [
+    "bad", "depression", "depressed", "hopeless", "stress", "stressed", "anxious", "anxiety",
+    "sad", "cry", "overwhelmed", "devastated", "hurt", "pain", "helpless", "suicide", "self-harm",
+    "fail", "failed", "zero marks", "panic", "unease", "disappointment", "disappointed",
+  ];
+
+  const positiveTokens = [
+    "good", "great", "happy", "joy", "joyful", "excited", "hopeful", "better", "calm", "fine",
+    "relaxed", "peaceful", "grateful", "confident", "motivated", "amazing", "wonderful",
+  ];
+
+  const negCount = negativeTokens.reduce((sum, token) => sum + (text.includes(token) ? 1 : 0), 0);
+  const posCount = positiveTokens.reduce((sum, token) => sum + (text.includes(token) ? 1 : 0), 0);
+
+  if (negCount === 0 && posCount === 0) return 0;
+  if (negCount > posCount) return -0.7;
+  if (posCount > negCount) return 0.7;
+  return 0;
+};
+
+const computeTextScore = ({ finalEmotion, modelEmotion, message, confidence, riskLevel }) => {
+  let base = emotionBaseScore(finalEmotion);
+
+  if (base === 0) {
+    base = emotionBaseScore(modelEmotion);
+  }
+
+  if (base === 0) {
+    base = keywordSentimentScore(message);
+  }
+
+  if (base === 0 && String(message || "").trim()) {
+    base = ["high", "medium"].includes(String(riskLevel || "").toLowerCase()) ? -0.4 : 0.25;
+  }
+
+  const parsedConfidence = clamp01(confidence);
+  const effectiveConfidence = parsedConfidence > 0 ? parsedConfidence : 0.6;
+
+  return Math.round(base * effectiveConfidence * 100) / 100;
+};
+
+const serializeSessionDetails = (session) => {
+  const messages = (session.messages || []).map((m) => ({
+    userMessage: decrypt(m.userMessage),
+    aiResponse: m.aiResponse,
+    textScore: m.textScore || 0,
+    voiceScore: m.voiceScore || 0,
+    faceScore: m.faceScore || 0,
+    finalScore: m.finalScore || 0,
+    emotion: m.emotion || "neutral",
+    timestamp: m.timestamp,
+  }));
+
+  return {
+    id: session._id,
+    studentId: session.studentId,
+    sessionDuration: session.sessionDuration,
+    status: session.status,
+    startedAt: session.startedAt,
+    endedAt: session.endedAt,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    finalMood: session.finalMood,
+    finalScore: session.finalScore,
+    riskLevel: session.riskLevel,
+    averageTextScore: session.averageTextScore || 0,
+    averageVoiceScore: session.averageVoiceScore || 0,
+    averageFaceScore: session.averageFaceScore || 0,
+    messagesCount: messages.length,
+    messages,
+  };
+};
 // controllers/session.js
 
 export const sendMessage = async (req, res) => {
   try {
     const { sessionId, message, studentData } = req.body;
 
+    if (!sessionId || !message) {
+      return res.status(400).json({ msg: "sessionId and message are required" });
+    }
+
     // 1️⃣ Find session
     const session = await Session.findById(sessionId);
     if (!session) {
       return res.status(404).json({ msg: "Session not found" });
+    }
+    if (String(session.studentId) !== String(req.user.id)) {
+      return res.status(403).json({ msg: "You are not allowed to access this session" });
     }
 
     // 2️⃣ Call AI Service (🔥 MAIN CHANGE)
@@ -61,13 +175,19 @@ export const sendMessage = async (req, res) => {
     console.log("AI Result:", aiResult);
 
     if (!aiResult.success) {
-      return res.status(500).json({ msg: "AI processing failed" });
+      console.warn("AI processing degraded, continuing with fallback response");
     }
 
     const data = aiResult.data;
 
     // 3️⃣ Prepare scores (fallback safe)
-    const textScore = data.confidence || 0;   // from emotion model
+    const textScore = computeTextScore({
+      finalEmotion: data.finalEmotion,
+      modelEmotion: data.modelEmotion,
+      message,
+      confidence: data.confidence,
+      riskLevel: data.riskLevel,
+    });
     const voiceScore = 0;
     const faceScore = 0;
 
@@ -95,7 +215,7 @@ export const sendMessage = async (req, res) => {
       reply: data.reply,
       emotion: data.finalEmotion,
       score: finalScore,
-      riskLevel: data.riskLevel,
+      riskLevel: data.riskLevel || toRiskLevel(finalScore),
       action: data.action,
     });
 
@@ -115,6 +235,9 @@ export const endSession = async (req, res) => {
 
     if (!session) {
       return res.status(404).json({ msg: "Session not found" });
+    }
+    if (String(session.studentId) !== String(req.user.id)) {
+      return res.status(403).json({ msg: "You are not allowed to access this session" });
     }
 
     // 2️⃣ Get student
@@ -189,10 +312,16 @@ export const endSession = async (req, res) => {
     res.status(200).json({
       success: true,
       session: {
+        id: session._id,
         finalScore,
         finalMood,
         riskLevel,
+        averageTextScore: avgText,
+        averageVoiceScore: avgVoice,
+        averageFaceScore: avgFace,
+        messagesCount: msgs.length,
       },
+      sessionDetails: serializeSessionDetails(session),
       student: {
         currentMood: student.currentMood,
         moodScore: student.moodScore,
@@ -202,5 +331,28 @@ export const endSession = async (req, res) => {
 
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+// Get full details of one session for report view
+export const getSessionDetails = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const session = await Session.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ msg: "Session not found" });
+    }
+
+    if (String(session.studentId) !== String(req.user.id)) {
+      return res.status(403).json({ msg: "You are not allowed to access this session" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      session: serializeSessionDetails(session),
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 };
