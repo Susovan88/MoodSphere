@@ -1,6 +1,6 @@
 import express from "express";
 import { signup,login } from "../controllers/auth.js";
-import { startSession, sendMessage, endSession } from "../controllers/session.js";
+import { startSession, sendMessage, endSession, getSessionDetails } from "../controllers/session.js";
 import { protect as auth } from "../middleware/auth.js";
 import { getStudentProfile, updateStudentProfile } from "../controllers/profile.js";
 import {
@@ -21,6 +21,7 @@ router.post("/login",login);
 router.post("/start", auth, startSession);
 router.post("/message", auth, sendMessage);
 router.post("/end", auth, endSession);
+router.get("/session/:sessionId/details", auth, getSessionDetails);
 
 // Additional routes for profile
 router.get("/profile", auth, getStudentProfile);
