@@ -10,13 +10,8 @@ import {
   LandingView, SessionView, AnalyzingView, ResultsView
 } from "@/components/mood-tracking"
 
-const INTERVIEW_QUESTIONS = [
-  "Tell me how you are feeling right now in one or two lines.",
-  "What was the most stressful moment in your day today?",
-  "Did anything make you feel better today?",
-  "How is your sleep and energy level this week?",
-  "What support do you feel you need right now?",
-]
+const INITIAL_INTERVIEW_PROMPT =
+  "Tell me how you are feeling right now in one or two lines."
 
 const CAPTURE_INTERVAL_MS = 1800
 const API_BASE_DEFAULT = process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "http://localhost:5005"
@@ -83,7 +78,7 @@ export default function MoodTrackingPage() {
   const [aiTyping, setAiTyping] = useState(false)
   const [result, setResult] = useState<MoodResult | null>(null)
   const [analyzeStep, setAnalyzeStep] = useState(0)
-  const [questionIndex, setQuestionIndex] = useState(0)
+  const [currentPrompt, setCurrentPrompt] = useState(INITIAL_INTERVIEW_PROMPT)
   const [isRecording, setIsRecording] = useState(false)
   const [responseCount, setResponseCount] = useState(0)
   const [activeStream, setActiveStream] = useState<MediaStream | null>(null)
@@ -274,7 +269,7 @@ export default function MoodTrackingPage() {
     setIsRecording(true)
   }, [acquireStream, captureFrame, resetTranscript])
 
-  const stopTurnRecording = useCallback(async (idx: number): Promise<RecordedTurn | null> => {
+  const stopTurnRecording = useCallback(async (questionLabel: string): Promise<RecordedTurn | null> => {
     // Keep both pre-stop and post-stop snapshots because Web Speech can flush final words on stop.
     const transcriptBeforeStop = normalizeTranscript(transcriptRef.current)
 
@@ -328,7 +323,7 @@ export default function MoodTrackingPage() {
       ])
 
       console.warn("No speech captured for turn", {
-        questionNumber: idx + 1,
+        questionNumber: turnsRef.current.length + 1,
         transcriptBeforeStop,
         transcriptAfterStop,
       })
@@ -338,7 +333,7 @@ export default function MoodTrackingPage() {
 
     // 6. Persist turn data 
     const savedTurn: RecordedTurn = {
-      question:   INTERVIEW_QUESTIONS[idx] || "Interview answer",
+      question:   questionLabel || "Interview answer",
       transcript: savedTranscript,
       frames:     [...turnFramesRef.current],
       audioBlob,
@@ -355,7 +350,7 @@ export default function MoodTrackingPage() {
 
     //  7. Console log 
     console.log("=== Recorded Turn Payload ===", {
-      questionNumber:     idx + 1,
+      questionNumber:     turnsRef.current.length,
       question:           savedTurn.question,
       transcript:         savedTurn.transcript,
       transcriptBeforeStop,
@@ -373,8 +368,7 @@ export default function MoodTrackingPage() {
   //  session flow
   const stopAndAdvance = async () => {
     if (!isRecording) return
-    const idx = questionIndex
-    const savedTurn = await stopTurnRecording(idx)
+    const savedTurn = await stopTurnRecording(currentPrompt)
     if (!savedTurn) return
 
     setAiTyping(true)
@@ -402,23 +396,7 @@ export default function MoodTrackingPage() {
     await new Promise<void>((resolve) => setTimeout(resolve, 600))
     setAiTyping(false)
     setMsgs((prev) => [...prev, { role: "ai", text: aiReply, ts: Date.now() }])
-
-    const nextIdx = idx + 1
-    if (nextIdx >= INTERVIEW_QUESTIONS.length) {
-      setMsgs((prev) => [
-        ...prev,
-        { role: "ai", text: "All questions are complete. Click End Session to generate your report.", ts: Date.now() },
-      ])
-      return
-    }
-
-    setTimeout(() => {
-      setQuestionIndex(nextIdx)
-      setMsgs((prev) => [
-        ...prev,
-        { role: "ai", text: INTERVIEW_QUESTIONS[nextIdx], ts: Date.now() },
-      ])
-    }, 900)
+    setCurrentPrompt(aiReply)
   }
 
   const startSession = async () => {
@@ -438,7 +416,7 @@ export default function MoodTrackingPage() {
     setMsgs([])
     setResult(null)
     setElapsed(0)
-    setQuestionIndex(0)
+    setCurrentPrompt(INITIAL_INTERVIEW_PROMPT)
     setResponseCount(0)
     setIsRecording(false)
     setBackendSessionId(null)
@@ -471,7 +449,7 @@ export default function MoodTrackingPage() {
       setAiTyping(true)
       setTimeout(() => {
         setAiTyping(false)
-        setMsgs([{ role: "ai", text: INTERVIEW_QUESTIONS[0], ts: Date.now() }])
+        setMsgs([{ role: "ai", text: INITIAL_INTERVIEW_PROMPT, ts: Date.now() }])
         // User must click "Start Recording" manually — no auto-start
       }, 900)
     }, 300)
@@ -484,7 +462,7 @@ export default function MoodTrackingPage() {
     }
 
     if (isRecording) {
-      const savedTurn = await stopTurnRecording(questionIndex)
+      const savedTurn = await stopTurnRecording(currentPrompt)
       if (savedTurn) {
         try {
           const data = await requestWithFallback<BackendSendMessage>("/api/student/message", {
@@ -605,7 +583,7 @@ export default function MoodTrackingPage() {
     setHasVideo(false)
     setMsgs([])
     setResult(null)
-    setQuestionIndex(0)
+    setCurrentPrompt(INITIAL_INTERVIEW_PROMPT)
     setResponseCount(0)
     setBackendSessionId(null)
     setIsRecording(false)
@@ -633,9 +611,9 @@ export default function MoodTrackingPage() {
           <SessionView
             key="session"
             elapsed={elapsed}
-            currentQuestion={Math.min(questionIndex + 1, INTERVIEW_QUESTIONS.length)}
-            totalQuestions={INTERVIEW_QUESTIONS.length}
-            questionText={INTERVIEW_QUESTIONS[questionIndex] || "Session complete"}
+            currentQuestion={responseCount + 1}
+            totalQuestions={Math.max(1, responseCount + 1)}
+            questionText={currentPrompt}
             isRecording={isRecording}
             transcriptDraft={transcript}
             onTranscriptChange={() => {}}
